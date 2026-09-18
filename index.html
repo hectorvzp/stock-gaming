@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Controle de Estoque — Gear Control</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>"
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="css/styles.css" />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.1/sweetalert2.all.min.js"></script>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">🎮</div>
+        <div>
+          <h1>Gear Control</h1>
+          <p>Estoque de equipamentos gamer</p>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html" class="nav-link active">Estoque Principal</a>
+        <a href="atribuidos.html" class="nav-link">Atribuídos</a>
+        <a href="tarefas.html" class="nav-link">Lembretes & Tarefas</a>
+      </nav>
+    </div>
+    <div class="circuit-rule"></div>
+
+    <div class="wrap">
+      <!-- DASHBOARD CARDS -->
+      <div
+        class="stats"
+        style="grid-template-columns: repeat(3, 1fr); margin-bottom: 1.5rem"
+      ></div>
+
+      <!-- VISÃO POR CATEGORIA -->
+      <div class="panel" style="margin-bottom: 1.5rem">
+        <div class="panel-head">
+          <h2>Resumo de Equipamentos e Uso</h2>
+        </div>
+        <div class="panel-body">
+          <div
+            id="categoryDashboardGrid"
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+              gap: 0.75rem;
+            "
+          ></div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <!-- FORMULÁRIO DE CADASTRO -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2 id="formTitle">Cadastrar item</h2>
+          </div>
+          <div class="panel-body">
+            <form id="productForm">
+              <div class="field">
+                <label for="nome">Nome / Modelo do equipamento</label>
+                <input
+                  type="text"
+                  id="nome"
+                  placeholder="Ex: PC Gamer i7, Monitor Odyssey..."
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label for="categoria">Categoria</label>
+                <select id="categoria" required>
+                  <option value="">Selecione...</option>
+                  <option>PC</option>
+                  <option>Monitor</option>
+                  <option>Wacom</option>
+                  <option>Webcam</option>
+                  <option>Mouse</option>
+                  <option>Teclado</option>
+                  <option>Outro</option>
+                </select>
+              </div>
+
+              <!-- PEÇAS / COMPONENTES (EXIBIDO SE 'OUTRO' FOR SELECIONADO) -->
+              <div class="field" id="fieldOutroContainer" style="display: none">
+                <label for="categoriaOutroSub">Tipo de Componente / Peça</label>
+                <select id="categoriaOutroSub">
+                  <option value="">Selecione o componente...</option>
+                  <option>Placa de Vídeo</option>
+                  <option>M2 2TB</option>
+                  <option>M2 4TB</option>
+                  <option>Placa Mãe</option>
+                  <option>Fonte</option>
+                  <option>Water Cooler</option>
+                  <option>Memória RAM DDR4</option>
+                  <option>Memória RAM DDR5</option>
+                  <option>Gabinete</option>
+                </select>
+              </div>
+
+              <div style="display: flex; gap: 0.5rem">
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                  Adicionar item
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  id="cancelEditBtn"
+                  style="display: none"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- TABELA E FILTROS -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Itens em Estoque</h2>
+          </div>
+          <div class="panel-body">
+            <div class="chips" id="categoryFilters"></div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome / Modelo</th>
+                    <th>Categoria</th>
+                    <th style="width: 130px; text-align: right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+
+            <div class="empty-state" id="emptyState" style="display: none">
+              Nenhum item cadastrado nesta categoria.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAINEL DE CONTROLE DE MÍNIMOS -->
+      <details class="panel cat-panel" style="margin-top: 1.5rem">
+        <summary class="panel-head" style="cursor: pointer; list-style: none">
+          <h2>Definir Mínimos de Estoque & Gráfico</h2>
+        </summary>
+        <div class="panel-body">
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 300px;
+              gap: 1.5rem;
+              align-items: start;
+            "
+          >
+            <div>
+              <div
+                id="categoryList"
+                style="display: flex; flex-direction: column; gap: 0.5rem"
+              ></div>
+              <button
+                class="btn btn-primary"
+                id="saveMinimumsBtn"
+                style="margin-top: 1rem"
+              >
+                Salvar Mínimos
+              </button>
+            </div>
+            <div
+              style="
+                display: flex;
+                justify-content: center;
+                align-items: center;
+              "
+            >
+              <canvas id="categoryChart" width="200" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <footer>Gear Control — dados salvos localmente neste navegador</footer>
+
+    <!-- SCRIPT COMO MÓDULO -->
+    <script type="module" src="./scripts/app.js"></script>
+  </body>
+</html>

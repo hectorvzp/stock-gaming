@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lembretes e Tarefas — Gear Control</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>"
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="css/styles.css" />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.10.1/sweetalert2.all.min.js"></script>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">🎮</div>
+        <div>
+          <h1>Gear Control</h1>
+          <p>Estoque de equipamentos gamer</p>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html" class="nav-link">Estoque Principal</a>
+        <a href="atribuidos.html" class="nav-link">Atribuídos</a>
+        <a href="tarefas.html" class="nav-link active">Lembretes & Tarefas</a>
+      </nav>
+    </div>
+    <div class="circuit-rule"></div>
+
+    <div class="wrap">
+      <div class="grid">
+        <!-- FORMULÁRIO DE TAREFAS -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Criar Lembrete / Tarefa</h2>
+          </div>
+          <div class="panel-body">
+            <form id="taskForm">
+              <div class="field">
+                <label for="taskTitle">Descrição da tarefa</label>
+                <input
+                  type="text"
+                  id="taskTitle"
+                  placeholder="Ex: Formatar PC 03, Comprar mouses..."
+                  required
+                />
+              </div>
+              <button type="submit" class="btn btn-primary">
+                Adicionar Lembrete
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- LISTA DE TAREFAS PENDENTES -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Tarefas Pendentes</h2>
+          </div>
+          <div class="panel-body">
+            <ul
+              id="taskList"
+              style="
+                list-style: none;
+                padding: 0;
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+              "
+            ></ul>
+            <div class="empty-state" id="taskEmptyState" style="display: none">
+              Nenhuma tarefa pendente no momento! 🎉
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>Gear Control — dados salvos localmente neste navegador</footer>
+
+    <!-- SCRIPT COMO MÓDULO -->
+    <script type="module" src="./scripts/app.js"></script>
+  </body>
+</html>
