@@ -1,7 +1,5 @@
-import { STORAGE_KEY, MINIMOS_KEY, TAREFAS_KEY } from "./constants.js";
 import {
   state,
-  recarregarEstadoLocal,
   adicionarProduto,
   atualizarProduto,
   removerProduto,
@@ -13,6 +11,7 @@ import {
   concluirTarefa,
   atualizarMinimos,
 } from "./state.js";
+import { escutarEstoque, escutarTarefas, escutarMinimos } from "./storage.js";
 import {
   renderAll,
   renderCategoryFilters,
@@ -91,7 +90,6 @@ function confirmarExclusao(produto) {
   if (!window.Swal) {
     if (confirm(`Tem certeza que deseja remover "${produto.nome}"?`)) {
       removerProduto(produto.id);
-      renderAll();
     }
     return;
   }
@@ -109,7 +107,6 @@ function confirmarExclusao(produto) {
   }).then((resultado) => {
     if (resultado.isConfirmed) {
       removerProduto(produto.id);
-      renderAll();
       Swal.fire({
         icon: "success",
         title: "Removido.",
@@ -136,37 +133,35 @@ function inicializarEventos() {
 
   const taskForm = document.getElementById("taskForm");
   if (taskForm) {
-    taskForm.addEventListener("submit", (e) => {
+    taskForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const input = document.getElementById("taskTitle");
       if (input && input.value.trim()) {
-        adicionarTarefa(input.value);
+        await adicionarTarefa(input.value);
         input.value = "";
-        renderAll();
       }
     });
   }
 
   const taskList = document.getElementById("taskList");
   if (taskList) {
-    taskList.addEventListener("change", (e) => {
+    taskList.addEventListener("change", async (e) => {
       if (e.target.classList.contains("task-checkbox")) {
-        const id = Number(e.target.getAttribute("data-id"));
-        concluirTarefa(id);
-        renderAll();
+        const id = e.target.getAttribute("data-id");
+        await concluirTarefa(id);
       }
     });
   }
 
   const form = document.getElementById("productForm");
   if (form) {
-    form.addEventListener("submit", (evento) => {
+    form.addEventListener("submit", async (evento) => {
       evento.preventDefault();
       const dados = lerFormulario();
 
       try {
         if (state.editandoId !== null) {
-          atualizarProduto(state.editandoId, dados);
+          await atualizarProduto(state.editandoId, dados);
           if (window.Swal) {
             Swal.fire({
               icon: "success",
@@ -178,7 +173,7 @@ function inicializarEventos() {
             });
           }
         } else {
-          adicionarProduto(dados);
+          await adicionarProduto(dados);
           if (window.Swal) {
             Swal.fire({
               icon: "success",
@@ -191,7 +186,6 @@ function inicializarEventos() {
           }
         }
         limparFormulario();
-        renderAll();
       } catch (erro) {
         if (window.Swal) {
           Swal.fire({
@@ -219,9 +213,9 @@ function inicializarEventos() {
       const botao = evento.target.closest("button[data-action]");
       if (!botao) return;
 
-      const id = Number(botao.getAttribute("data-id"));
+      const id = botao.getAttribute("data-id");
       const acao = botao.getAttribute("data-action");
-      const produto = state.produtos.find((p) => p.id === id);
+      const produto = state.produtos.find((p) => String(p.id) === String(id));
       if (!produto) return;
 
       if (acao === "edit") {
@@ -242,10 +236,9 @@ function inicializarEventos() {
               return "Digite um nome antes de continuar.";
             }
           },
-        }).then((resultado) => {
+        }).then(async (resultado) => {
           if (resultado.isConfirmed) {
-            atribuirProduto(id, resultado.value);
-            renderAll();
+            await atribuirProduto(id, resultado.value);
             Swal.fire({
               icon: "success",
               title: `Atribuído a "${resultado.value.trim()}"!`,
@@ -264,18 +257,17 @@ function inicializarEventos() {
 
   const assignedTableBody = document.getElementById("assignedTableBody");
   if (assignedTableBody) {
-    assignedTableBody.addEventListener("click", (evento) => {
+    assignedTableBody.addEventListener("click", async (evento) => {
       const botao = evento.target.closest("button[data-action]");
       if (!botao) return;
 
-      const id = Number(botao.getAttribute("data-id"));
+      const id = botao.getAttribute("data-id");
       const acao = botao.getAttribute("data-action");
-      const produto = state.produtos.find((p) => p.id === id);
+      const produto = state.produtos.find((p) => String(p.id) === String(id));
       if (!produto) return;
 
       if (acao === "return") {
-        devolverAoEstoque(id);
-        renderAll();
+        await devolverAoEstoque(id);
         if (window.Swal) {
           Swal.fire({
             icon: "success",
@@ -291,18 +283,17 @@ function inicializarEventos() {
       }
     });
 
-    assignedTableBody.addEventListener("change", (evento) => {
+    assignedTableBody.addEventListener("change", async (evento) => {
       if (evento.target.classList.contains("atlas-checkbox")) {
-        const id = Number(evento.target.getAttribute("data-id"));
-        toggleAtlasOk(id, evento.target.checked);
-        renderAssignedTable();
+        const id = evento.target.getAttribute("data-id");
+        await toggleAtlasOk(id, evento.target.checked);
       }
     });
 
-    assignedTableBody.addEventListener("input", (evento) => {
+    assignedTableBody.addEventListener("input", async (evento) => {
       if (evento.target.classList.contains("obs-input")) {
-        const id = Number(evento.target.getAttribute("data-id"));
-        atualizarObservacao(id, evento.target.value);
+        const id = evento.target.getAttribute("data-id");
+        await atualizarObservacao(id, evento.target.value);
       }
     });
   }
@@ -333,7 +324,7 @@ function inicializarEventos() {
 
   const saveMinimumsBtn = document.getElementById("saveMinimumsBtn");
   if (saveMinimumsBtn) {
-    saveMinimumsBtn.addEventListener("click", () => {
+    saveMinimumsBtn.addEventListener("click", async () => {
       const inputs = document.querySelectorAll(".minimo-input");
       const novosMinimos = {};
 
@@ -343,8 +334,7 @@ function inicializarEventos() {
         novosMinimos[cat] = Number.isFinite(valor) && valor >= 0 ? valor : 0;
       });
 
-      atualizarMinimos(novosMinimos);
-      renderAll();
+      await atualizarMinimos(novosMinimos);
 
       if (window.Swal) {
         Swal.fire({
@@ -368,22 +358,24 @@ function inicializarEventos() {
 }
 
 function init() {
-  recarregarEstadoLocal();
   inicializarEventos();
-  renderAll();
-}
 
-window.addEventListener("pageshow", () => {
-  recarregarEstadoLocal();
-  renderAll();
-});
-
-window.addEventListener("storage", (e) => {
-  if (e.key === STORAGE_KEY || e.key === MINIMOS_KEY || e.key === TAREFAS_KEY) {
-    recarregarEstadoLocal();
+  // Ouve atualizações em tempo real no banco
+  escutarEstoque((produtos) => {
+    state.produtos = produtos;
     renderAll();
-  }
-});
+  });
+
+  escutarTarefas((tarefas) => {
+    state.tarefas = tarefas;
+    renderAll();
+  });
+
+  escutarMinimos((minimos) => {
+    state.minimos = minimos;
+    renderAll();
+  });
+}
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", init);
