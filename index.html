@@ -52,13 +52,24 @@
         </div>
         <div class="panel-body">
           <div
-            id="categoryDashboardGrid"
-            style="
-              display: grid;
-              grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-              gap: 0.75rem;
-            "
-          ></div>
+            class="stock-overview"
+          >
+            <div
+              id="categoryDashboardGrid"
+              class="category-dashboard-grid"
+            ></div>
+            <div
+              class="stock-chart-wrap"
+              role="img"
+              aria-label="Gráfico da quantidade total de itens em estoque por categoria"
+            >
+              <canvas id="categoryChart" width="220" height="220"></canvas>
+              <div class="stock-chart-total" aria-live="polite">
+                <strong id="stockChartTotal">0</strong>
+                <span>itens em estoque</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -70,13 +81,12 @@
           </div>
           <div class="panel-body">
             <form id="productForm">
-              <div class="field">
+              <div class="field" id="fieldNomeContainer">
                 <label for="nome">Nome / Modelo do equipamento</label>
                 <input
                   type="text"
                   id="nome"
                   placeholder="Ex: BR-IT15475, MOUSE, TECLADO..."
-                  required
                 />
               </div>
 
@@ -111,6 +121,22 @@
                 </select>
               </div>
 
+              <div class="field" id="fieldQuantityContainer" style="display: none">
+                <label for="quantidade">Quantidade a adicionar</label>
+                <input type="number" id="quantidade" min="1" step="1" value="1" />
+              </div>
+
+              <div class="field">
+                <label for="observacaoCadastro">
+                  Observação do item (opcional)
+                </label>
+                <textarea
+                  id="observacaoCadastro"
+                  rows="3"
+                  placeholder="Informações adicionais sobre este equipamento..."
+                ></textarea>
+              </div>
+
               <div style="display: flex; gap: 0.5rem">
                 <button type="submit" class="btn btn-primary" id="submitBtn">
                   Adicionar item
@@ -129,19 +155,38 @@
         </div>
 
         <!-- TABELA E FILTROS -->
+
         <div class="panel">
           <div class="panel-head">
             <h2>Itens em Estoque</h2>
           </div>
           <div class="panel-body">
+            <div class="stock-tools">
+              <button type="button" class="btn" id="exportCsvBtn">
+                Exportar CSV
+              </button>
+              <label class="btn" for="importCsvInput">Importar CSV</label>
+              <input
+                type="file"
+                id="importCsvInput"
+                accept=".csv,text/csv"
+                hidden
+              />
+            </div>
             <div class="chips" id="categoryFilters"></div>
 
-            <div class="table-wrap">
+            <div
+              class="table-wrap"
+              role="region"
+              aria-label="Itens em estoque; role horizontalmente para ver todas as colunas"
+              tabindex="0"
+            >
               <table>
                 <thead>
                   <tr>
                     <th>Nome / Modelo</th>
                     <th>Categoria</th>
+                    <th>Quantidade</th>
                     <th style="width: 130px; text-align: right">Ações</th>
                   </tr>
                 </thead>
@@ -159,16 +204,11 @@
       <!-- PAINEL DE CONTROLE DE MÍNIMOS -->
       <details class="panel cat-panel" style="margin-top: 1.5rem">
         <summary class="panel-head" style="cursor: pointer; list-style: none">
-          <h2>Definir Mínimos de Estoque & Gráfico</h2>
+          <h2>Definir Mínimos de Estoque</h2>
         </summary>
         <div class="panel-body">
           <div
-            style="
-              display: grid;
-              grid-template-columns: 1fr 300px;
-              gap: 1.5rem;
-              align-items: start;
-            "
+            style="display: block"
           >
             <div>
               <div
@@ -182,15 +222,6 @@
               >
                 Salvar Mínimos
               </button>
-            </div>
-            <div
-              style="
-                display: flex;
-                justify-content: center;
-                align-items: center;
-              "
-            >
-              <canvas id="categoryChart" width="200" height="200"></canvas>
             </div>
           </div>
         </div>

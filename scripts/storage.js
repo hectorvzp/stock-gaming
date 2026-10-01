@@ -6,6 +6,7 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
+  writeBatch,
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import {
   firebaseConfig,
@@ -40,15 +41,19 @@ export function carregarEstoqueLocal() {
     if (!bruto) return [];
     const dados = JSON.parse(bruto);
     if (!Array.isArray(dados)) return [];
-    return dados.map((p) => ({
-      status: "estoque",
-      atribuidoPara: null,
-      dataAtribuicao: null,
-      observacao: "",
-      atlasOk: false,
-      subcategoria: null,
-      ...p,
-    }));
+    return dados.map((p) => {
+      const { observacao, ...produto } = p;
+      return {
+        status: "estoque",
+        atribuidoPara: null,
+        dataAtribuicao: null,
+        atlasOk: false,
+        subcategoria: null,
+        ...produto,
+        observacaoCadastro:
+          produto.observacaoCadastro || observacao || "",
+      };
+    });
   } catch (e) {
     return [];
   }
@@ -59,6 +64,7 @@ export function salvarEstoqueLocal(produtos) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(produtos));
   } catch (e) {
     console.error("Erro ao salvar no localStorage:", e);
+    throw e;
   }
 }
 
@@ -118,7 +124,12 @@ export function escutarEstoque(callback) {
     (snapshot) => {
       const produtos = [];
       snapshot.forEach((docSnap) => {
-        produtos.push({ id: docSnap.id, ...docSnap.data() });
+        const { observacao, ...produto } = docSnap.data();
+        produtos.push({
+          id: docSnap.id,
+          ...produto,
+          observacaoCadastro: produto.observacaoCadastro || observacao || "",
+        });
       });
       salvarEstoqueLocal(produtos);
       callback(produtos);
@@ -196,6 +207,28 @@ export async function salvarProdutoFirestore(produto) {
   }
   const docRef = doc(db, "produtos", String(produto.id));
   await setDoc(docRef, produto);
+}
+
+export async function salvarProdutosFirestore(produtos) {
+  if (!db) {
+    const estoque = carregarEstoqueLocal();
+    for (const produto of produtos) {
+      const index = estoque.findIndex((p) => String(p.id) === String(produto.id));
+      if (index >= 0) estoque[index] = produto;
+      else estoque.push(produto);
+    }
+    salvarEstoqueLocal(estoque);
+    return;
+  }
+
+  if (produtos.length > 450) {
+    throw new Error("A operação excede o limite seguro de gravação em lote.");
+  }
+  const batch = writeBatch(db);
+  produtos.forEach((produto) => {
+    batch.set(doc(db, "produtos", String(produto.id)), produto);
+  });
+  await batch.commit();
 }
 
 export async function removerProdutoFirestore(id) {

@@ -5,7 +5,9 @@ import {
   removerProduto,
   atribuirProduto,
   devolverAoEstoque,
-  atualizarObservacao,
+  atualizarObservacaoCadastro,
+  ajustarQuantidadeEstoque,
+  importarProdutos,
   toggleAtlasOk,
   adicionarTarefa,
   concluirTarefa,
@@ -19,7 +21,79 @@ import {
   renderTable,
   renderAssignedTable,
   renderCategoryBreakdown,
+  setObservationSaveStatus,
 } from "./ui.js";
+import { exportarProdutosCsv, parseProdutosCsv } from "./csv.js";
+import {
+  produtoIndividual,
+} from "./constants.js";
+
+const noteSaveTimers = new Map();
+const noteStatusTimers = new Map();
+const noteSaveQueues = new Map();
+
+function exibirErroSalvamento(erro) {
+  console.error("Não foi possível salvar a observação do item:", erro);
+  if (window.Swal) {
+    Swal.fire({
+      icon: "error",
+      title: "Observação não salva",
+      text: erro.message,
+      background: "var(--bg-elev)",
+      color: "var(--text)",
+    });
+  } else {
+    alert(`Não foi possível salvar a observação: ${erro.message}`);
+  }
+}
+
+async function salvarObservacaoItem(input) {
+  const id = input.dataset.id;
+  const texto = input.value;
+  const anterior = noteSaveQueues.get(id) || Promise.resolve();
+  const gravar = () => atualizarObservacaoCadastro(id, texto);
+  const gravacao = anterior.then(gravar, gravar);
+  noteSaveQueues.set(id, gravacao);
+  setObservationSaveStatus(id, "Salvando...");
+
+  try {
+    await gravacao;
+    const editorAtual = [...document.querySelectorAll(".item-note-input")].find(
+      (editor) => editor.dataset.id === id,
+    );
+    if (editorAtual?.value.trim() === texto.trim()) {
+      setObservationSaveStatus(id, "Salvo");
+      const previousTimer = noteStatusTimers.get(id);
+      if (previousTimer) clearTimeout(previousTimer);
+      noteStatusTimers.set(
+        id,
+        setTimeout(() => {
+          setObservationSaveStatus(id, "");
+          noteStatusTimers.delete(id);
+        }, 2500),
+      );
+    }
+  } catch (erro) {
+    setObservationSaveStatus(id, "Erro ao salvar");
+    exibirErroSalvamento(erro);
+  } finally {
+    if (noteSaveQueues.get(id) === gravacao) noteSaveQueues.delete(id);
+  }
+}
+
+function programarSalvamentoObservacao(input) {
+  const id = input.dataset.id;
+  const timerAnterior = noteSaveTimers.get(id);
+  if (timerAnterior) clearTimeout(timerAnterior);
+  setObservationSaveStatus(id, "Alteração pendente");
+  noteSaveTimers.set(
+    id,
+    setTimeout(() => {
+      noteSaveTimers.delete(id);
+      void salvarObservacaoItem(input);
+    }, 700),
+  );
+}
 
 function lerFormulario() {
   const select = document.getElementById("categoria");
@@ -37,6 +111,8 @@ function lerFormulario() {
     categoria: catFinal,
     categoriaBase: valSelect,
     subcategoria: valSelect === "Outro" ? valSub : null,
+    observacaoCadastro: document.getElementById("observacaoCadastro").value,
+    quantidade: Number(document.getElementById("quantidade").value),
   };
 }
 
@@ -46,9 +122,17 @@ function limparFormulario() {
   const cancelEditBtn = document.getElementById("cancelEditBtn");
   const formTitle = document.getElementById("formTitle");
   const containerOutro = document.getElementById("fieldOutroContainer");
+  const quantityContainer = document.getElementById("fieldQuantityContainer");
+  const quantityInput = document.getElementById("quantidade");
+  const nameContainer = document.getElementById("fieldNomeContainer");
+  const nameInput = document.getElementById("nome");
 
   if (form) form.reset();
   if (containerOutro) containerOutro.style.display = "none";
+  if (quantityContainer) quantityContainer.style.display = "none";
+  if (nameContainer) nameContainer.style.display = "flex";
+  if (nameInput) nameInput.required = false;
+  if (quantityInput) quantityInput.value = "1";
   state.editandoId = null;
   if (submitBtn) submitBtn.textContent = "Adicionar item";
   if (formTitle) formTitle.textContent = "Cadastrar item";
@@ -57,10 +141,15 @@ function limparFormulario() {
 
 function preencherFormularioParaEdicao(produto) {
   document.getElementById("nome").value = produto.nome;
+  document.getElementById("observacaoCadastro").value =
+    produto.observacaoCadastro || "";
 
   const select = document.getElementById("categoria");
   const selectSub = document.getElementById("categoriaOutroSub");
   const containerOutro = document.getElementById("fieldOutroContainer");
+  const quantityContainer = document.getElementById("fieldQuantityContainer");
+  const nameContainer = document.getElementById("fieldNomeContainer");
+  const nameInput = document.getElementById("nome");
 
   const catBase =
     produto.categoriaBase ||
@@ -74,6 +163,9 @@ function preencherFormularioParaEdicao(produto) {
     if (containerOutro) containerOutro.style.display = "none";
     if (selectSub) selectSub.value = "";
   }
+  if (quantityContainer) quantityContainer.style.display = "none";
+  if (nameContainer) nameContainer.style.display = "flex";
+  if (nameInput) nameInput.required = true;
 
   state.editandoId = produto.id;
   const submitBtn = document.getElementById("submitBtn");
@@ -120,15 +212,61 @@ function confirmarExclusao(produto) {
 }
 
 function inicializarEventos() {
+  document.addEventListener("input", (evento) => {
+    const input = evento.target.closest(".item-note-input");
+    if (input) programarSalvamentoObservacao(input);
+  });
+
+  document.addEventListener(
+    "focusout",
+    (evento) => {
+      const input = evento.target.closest(".item-note-input");
+      if (!input) return;
+      const id = input.dataset.id;
+      const timer = noteSaveTimers.get(id);
+      const produto = state.produtos.find(
+        (item) => String(item.id) === String(id),
+      );
+      if (!timer && produto?.observacaoCadastro === input.value.trim()) return;
+      if (timer) clearTimeout(timer);
+      noteSaveTimers.delete(id);
+      void salvarObservacaoItem(input);
+    },
+    true,
+  );
+
   const selectCat = document.getElementById("categoria");
   if (selectCat) {
-    selectCat.addEventListener("change", function () {
+    const atualizarCamposCategoria = () => {
       const containerOutro = document.getElementById("fieldOutroContainer");
+      const containerNome = document.getElementById("fieldNomeContainer");
+      const inputNome = document.getElementById("nome");
+      const containerQuantidade = document.getElementById(
+        "fieldQuantityContainer",
+      );
+      const inputQuantidade = document.getElementById("quantidade");
+      const individual = produtoIndividual({
+        categoria: selectCat.value,
+        categoriaBase: selectCat.value,
+      });
       if (containerOutro) {
         containerOutro.style.display =
-          this.value === "Outro" ? "block" : "none";
+          selectCat.value === "Outro" ? "block" : "none";
       }
-    });
+      if (containerNome) {
+        containerNome.style.display = individual ? "flex" : "none";
+      }
+      if (inputNome) inputNome.required = individual;
+      if (inputQuantidade) {
+        inputQuantidade.required = Boolean(selectCat.value && !individual);
+      }
+      if (containerQuantidade) {
+        containerQuantidade.style.display =
+          selectCat.value && !individual ? "flex" : "none";
+      }
+    };
+    selectCat.addEventListener("change", atualizarCamposCategoria);
+    atualizarCamposCategoria();
   }
 
   const taskForm = document.getElementById("taskForm");
@@ -186,6 +324,7 @@ function inicializarEventos() {
           }
         }
         limparFormulario();
+        renderAll();
       } catch (erro) {
         if (window.Swal) {
           Swal.fire({
@@ -209,7 +348,7 @@ function inicializarEventos() {
 
   const tableBody = document.getElementById("tableBody");
   if (tableBody) {
-    tableBody.addEventListener("click", (evento) => {
+    tableBody.addEventListener("click", async (evento) => {
       const botao = evento.target.closest("button[data-action]");
       if (!botao) return;
 
@@ -218,7 +357,49 @@ function inicializarEventos() {
       const produto = state.produtos.find((p) => String(p.id) === String(id));
       if (!produto) return;
 
-      if (acao === "edit") {
+      if (acao === "adjust-quantity") {
+        const atual = Number(produto.quantidade) || 0;
+        let novaQuantidade;
+        if (window.Swal) {
+          const resultado = await Swal.fire({
+            title: `Ajustar ${produto.nome}`,
+            text: "Informe o saldo físico disponível. Saldo negativo indica falta para os PCs atribuídos.",
+            input: "number",
+            inputValue: atual,
+            inputAttributes: { step: "1" },
+            showCancelButton: true,
+            confirmButtonText: "Salvar quantidade",
+            cancelButtonText: "Cancelar",
+            background: "var(--bg-elev)",
+            color: "var(--text)",
+          });
+          if (!resultado.isConfirmed) return;
+          novaQuantidade = Number(resultado.value);
+        } else {
+          const valor = prompt(
+            `Quantidade atual: ${atual}. Informe o novo saldo:`,
+            String(atual),
+          );
+          if (valor === null) return;
+          novaQuantidade = Number(valor);
+        }
+        try {
+          await ajustarQuantidadeEstoque(id, novaQuantidade);
+          renderAll();
+        } catch (erro) {
+          if (window.Swal) {
+            await Swal.fire({
+              icon: "error",
+              title: "Quantidade não salva",
+              text: erro.message,
+              background: "var(--bg-elev)",
+              color: "var(--text)",
+            });
+          } else {
+            alert(erro.message);
+          }
+        }
+      } else if (acao === "edit") {
         preencherFormularioParaEdicao(produto);
       } else if (acao === "assign") {
         if (!window.Swal) return;
@@ -238,15 +419,35 @@ function inicializarEventos() {
           },
         }).then(async (resultado) => {
           if (resultado.isConfirmed) {
-            await atribuirProduto(id, resultado.value);
-            Swal.fire({
-              icon: "success",
-              title: `Atribuído a "${resultado.value.trim()}"!`,
-              timer: 1400,
-              showConfirmButton: false,
-              background: "var(--bg-elev)",
-              color: "var(--text)",
-            });
+            try {
+              const resultadoAtribuicao = await atribuirProduto(
+                id,
+                resultado.value,
+              );
+              const falta = resultadoAtribuicao.categoriasEmFalta;
+              await Swal.fire({
+                icon: falta.length ? "warning" : "success",
+                title: falta.length
+                  ? "PC atribuído com itens em falta"
+                  : `Atribuído a "${resultado.value.trim()}"!`,
+                text: falta.length
+                  ? `O estoque ficou negativo para: ${falta.join(", ")}. Ajuste as quantidades quando necessário.`
+                  : "",
+                timer: falta.length ? undefined : 1400,
+                showConfirmButton: Boolean(falta.length),
+                background: "var(--bg-elev)",
+                color: "var(--text)",
+              });
+              renderAll();
+            } catch (erro) {
+              await Swal.fire({
+                icon: "error",
+                title: "Não foi possível atribuir",
+                text: erro.message,
+                background: "var(--bg-elev)",
+                color: "var(--text)",
+              });
+            }
           }
         });
       } else if (acao === "delete") {
@@ -287,15 +488,10 @@ function inicializarEventos() {
       if (evento.target.classList.contains("atlas-checkbox")) {
         const id = evento.target.getAttribute("data-id");
         await toggleAtlasOk(id, evento.target.checked);
+        renderAssignedTable();
       }
     });
 
-    assignedTableBody.addEventListener("input", async (evento) => {
-      if (evento.target.classList.contains("obs-input")) {
-        const id = evento.target.getAttribute("data-id");
-        await atualizarObservacao(id, evento.target.value);
-      }
-    });
   }
 
   const categoryFilters = document.getElementById("categoryFilters");
@@ -319,6 +515,79 @@ function inicializarEventos() {
       state.filtroCategoriaAtribuido = chip.getAttribute("data-cat");
       renderAssignedCategoryFilters();
       renderAssignedTable();
+    });
+  }
+
+  const buscaAtribuidos = document.getElementById("busca-atribuidos");
+  if (buscaAtribuidos) {
+    buscaAtribuidos.addEventListener("input", renderAssignedTable);
+  }
+
+  const filtroAtlas = document.getElementById("filtro-atlas");
+  if (filtroAtlas) {
+    filtroAtlas.addEventListener("change", renderAssignedTable);
+  }
+
+  const clearAssignedFilters = document.getElementById(
+    "clearAssignedFilters",
+  );
+  if (clearAssignedFilters) {
+    clearAssignedFilters.addEventListener("click", () => {
+      const search = document.getElementById("busca-atribuidos");
+      const atlas = document.getElementById("filtro-atlas");
+      if (search) search.value = "";
+      if (atlas) atlas.value = "todos";
+      state.filtroCategoriaAtribuido = "Todas";
+      renderAssignedCategoryFilters();
+      renderAssignedTable();
+    });
+  }
+
+  const exportCsvBtn = document.getElementById("exportCsvBtn");
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener("click", () =>
+      exportarProdutosCsv(state.produtos),
+    );
+  }
+
+  const importCsvInput = document.getElementById("importCsvInput");
+  if (importCsvInput) {
+    importCsvInput.addEventListener("change", async () => {
+      const arquivo = importCsvInput.files[0];
+      if (!arquivo) return;
+
+      try {
+        const produtos = parseProdutosCsv(await arquivo.text());
+        const resultado = await importarProdutos(produtos);
+        renderAll();
+        const mensagem = `${resultado.importados} item(ns) importado(s). ${resultado.ignorados} item(ns) ignorado(s) por já existirem.`;
+        if (window.Swal) {
+          await Swal.fire({
+            icon: "success",
+            title: "Importação concluída",
+            text: mensagem,
+            background: "var(--bg-elev)",
+            color: "var(--text)",
+          });
+        } else {
+          alert(mensagem);
+        }
+      } catch (erro) {
+        console.error("Não foi possível importar o CSV:", erro);
+        if (window.Swal) {
+          await Swal.fire({
+            icon: "error",
+            title: "Importação não concluída",
+            text: erro.message,
+            background: "var(--bg-elev)",
+            color: "var(--text)",
+          });
+        } else {
+          alert(`Não foi possível importar o CSV: ${erro.message}`);
+        }
+      } finally {
+        importCsvInput.value = "";
+      }
     });
   }
 

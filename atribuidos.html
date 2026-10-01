@@ -44,8 +44,40 @@
         </div>
         <div class="panel-body">
           <div class="chips" id="assignedCategoryFilters"></div>
+          <div class="assigned-toolbar">
+            <div class="field">
+              <label for="busca-atribuidos">Buscar</label>
+              <input
+                type="search"
+                id="busca-atribuidos"
+                placeholder="Usuário, item ou observação..."
+                autocomplete="off"
+              />
+            </div>
+            <div class="field">
+              <label for="filtro-atlas">Status Atlas</label>
+              <select id="filtro-atlas">
+                <option value="todos">Todos os registros</option>
+                <option value="ok">Somente OK no Atlas</option>
+                <option value="pendente">Somente Pendentes</option>
+              </select>
+            </div>
+            <button type="button" class="btn" id="clearAssignedFilters">
+              Limpar filtros
+            </button>
+            <span
+              id="assignedResultCount"
+              role="status"
+              aria-live="polite"
+            ></span>
+          </div>
 
-          <div class="table-wrap">
+          <div
+            class="table-wrap"
+            role="region"
+            aria-label="Equipamentos atribuídos; role horizontalmente para ver todas as colunas"
+            tabindex="0"
+          >
             <table>
               <thead>
                 <tr>
@@ -53,7 +85,7 @@
                   <th>Categoria</th>
                   <th>Atribuído Para</th>
                   <th>Data</th>
-                  <th>Observação</th>
+                  <th>Observação do item</th>
                   <th>Atlas</th>
                   <th style="width: 160px; text-align: right">Ações</th>
                 </tr>

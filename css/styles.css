@@ -136,6 +136,92 @@ body {
   }
 }
 
+@media (max-width: 600px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem;
+  }
+
+  .nav-links {
+    flex-wrap: wrap;
+  }
+
+  .nav-link {
+    padding: 0.45rem 0.65rem;
+  }
+
+  .wrap {
+    margin: 1rem auto;
+    padding: 0 0.75rem;
+  }
+
+  .panel-body {
+    padding: 0.85rem;
+  }
+
+  .stats {
+    grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)) !important;
+  }
+
+  .assigned-toolbar .field {
+    flex-basis: 100%;
+  }
+
+  .table-wrap table,
+  .table-wrap tbody,
+  .table-wrap tr,
+  .table-wrap td {
+    display: block;
+    width: 100%;
+  }
+
+  .table-wrap table {
+    min-width: 0;
+  }
+
+  .table-wrap thead {
+    display: none;
+  }
+
+  .table-wrap tbody tr {
+    margin-bottom: 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .table-wrap tbody td {
+    display: grid;
+    grid-template-columns: minmax(100px, 32%) minmax(0, 1fr);
+    gap: 0.65rem;
+    align-items: start;
+    padding: 0.7rem;
+    overflow-wrap: anywhere;
+  }
+
+  .table-wrap tbody td::before {
+    content: attr(data-label);
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .table-wrap .item-note-input {
+    min-width: 0;
+  }
+
+  .table-wrap .row-actions {
+    justify-content: flex-start;
+  }
+
+  .row-actions {
+    flex-wrap: wrap;
+  }
+}
+
 .panel {
   background: var(--bg-elev);
   border: 1px solid var(--line);
@@ -160,6 +246,65 @@ body {
 
 .panel-body {
   padding: 1.25rem;
+}
+
+.stock-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.category-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+}
+
+.stock-chart-wrap {
+  position: relative;
+  width: min(100%, 220px);
+  justify-self: center;
+}
+
+.stock-chart-wrap canvas {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.stock-chart-total {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  text-align: center;
+}
+
+.stock-chart-total strong {
+  color: var(--text);
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.stock-chart-total span {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 600px) {
+  .stock-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-chart-wrap {
+    grid-row: 1;
+    width: min(100%, 180px);
+  }
 }
 
 /* ===== CARDS DE ESTATÍSTICA ===== */
@@ -209,7 +354,9 @@ body {
 }
 
 input[type="text"],
+input[type="search"],
 input[type="number"],
+textarea,
 select {
   width: 100%;
   padding: 0.65rem 0.85rem;
@@ -224,10 +371,16 @@ select {
 }
 
 input[type="text"]:focus,
+input[type="search"]:focus,
 input[type="number"]:focus,
+textarea:focus,
 select:focus {
   border-color: var(--cyan);
   box-shadow: 0 0 0 2px rgba(0, 245, 212, 0.2);
+}
+
+textarea {
+  resize: vertical;
 }
 
 /* ===== BOTÕES ===== */
@@ -316,6 +469,81 @@ select:focus {
 .table-wrap {
   width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.stock-tools,
+.assigned-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.stock-tools .btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  cursor: pointer;
+}
+
+.quantity-deficit {
+  color: var(--danger);
+}
+
+.quantity-deficit-label {
+  display: inline-block;
+  margin-left: 0.35rem;
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.assigned-toolbar .field {
+  flex: 1 1 220px;
+  margin-bottom: 0;
+}
+
+#assignedResultCount {
+  padding-bottom: 0.65rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.stock-note {
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.stock-note summary {
+  width: fit-content;
+  color: var(--cyan);
+  cursor: pointer;
+}
+
+.assigned-item-name {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.item-note-input {
+  display: block;
+  min-width: 180px;
+  margin-top: 0.4rem;
+  resize: vertical;
+}
+
+.note-save-status {
+  display: block;
+  min-height: 1rem;
+  margin-top: 0.2rem;
+  color: var(--text-dim);
+  font-size: 0.72rem;
 }
 
 table {

@@ -1,7 +1,38 @@
-import { CATEGORY_COLORS, CATEGORIAS, CATEGORIAS_PECAS } from "./constants.js";
+import {
+  CATEGORY_COLORS,
+  CATEGORIAS,
+  CATEGORIAS_PECAS,
+  categoriaBaseProduto,
+  produtoIndividual,
+} from "./constants.js";
 import { state } from "./state.js";
 
 let chartInstance = null;
+const observationSaveStatus = new Map();
+
+export function setObservationSaveStatus(id, status) {
+  const productId = String(id);
+  observationSaveStatus.set(productId, status);
+  const statusElement = document.querySelector(
+    `[data-note-status="${CSS.escape(productId)}"]`,
+  );
+  if (statusElement) statusElement.textContent = status;
+}
+
+function renderObservationEditor(produto) {
+  const id = escapeHtml(String(produto.id));
+  return `
+    <textarea
+      class="item-note-input"
+      data-id="${id}"
+      aria-label="Observação do item ${escapeHtml(produto.nome)}"
+      placeholder="Adicionar ou editar observação..."
+      rows="2"
+    >${escapeHtml(produto.observacaoCadastro || "")}</textarea>
+    <span class="note-save-status" data-note-status="${id}" aria-live="polite">${
+      observationSaveStatus.get(String(produto.id)) || ""
+    }</span>`;
+}
 
 export function escapeHtml(str) {
   if (!str) return "";
@@ -14,12 +45,59 @@ export function itensEmEstoque() {
   return state.produtos.filter((p) => p.status === "estoque");
 }
 
+function quantidadeEmEstoque(produto) {
+  const quantidade = Number(produto.quantidade);
+  return Number.isFinite(quantidade) ? quantidade : 1;
+}
+
+function contarUnidades(produtos) {
+  return produtos.reduce(
+    (total, produto) => total + quantidadeEmEstoque(produto),
+    0,
+  );
+}
+
 export function itensAtribuidos() {
   const itens = state.produtos.filter((p) => p.status === "atribuido");
-  if (state.filtroCategoriaAtribuido === "Todas") return itens;
-  return itens.filter(
-    (p) => (p.categoriaBase || p.categoria) === state.filtroCategoriaAtribuido,
-  );
+  const termo = document
+    .getElementById("busca-atribuidos")
+    ?.value.trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR") || "";
+  const filtroAtlas =
+    document.getElementById("filtro-atlas")?.value || "todos";
+
+  return itens.filter((p) => {
+    const categoria = p.categoriaBase || p.categoria;
+    const correspondeCategoria =
+      state.filtroCategoriaAtribuido === "Todas" ||
+      categoria === state.filtroCategoriaAtribuido;
+    const correspondeAtlas =
+      filtroAtlas === "todos" ||
+      (filtroAtlas === "ok" && Boolean(p.atlasOk)) ||
+      (filtroAtlas === "pendente" && !p.atlasOk);
+    const texto = [
+      p.nome,
+      p.atribuidoPara,
+      p.categoria,
+      p.categoriaBase,
+      p.subcategoria,
+      p.observacaoCadastro,
+      p.dataAtribuicao,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR");
+
+    return (
+      correspondeCategoria &&
+      correspondeAtlas &&
+      (!termo || texto.includes(termo))
+    );
+  });
 }
 
 export function produtosFiltrados() {
@@ -57,10 +135,10 @@ export function renderStats() {
 
   const emEstoque = itensEmEstoque();
   const atribuidos = state.produtos.filter((p) => p.status === "atribuido");
-  const contagem = contarPorCategoriaRecursivo(emEstoque);
+  const contagem = contarUnidades(emEstoque);
   const alertas = categoriasEmAlerta(contagem, state.minimos);
 
-  statCount.textContent = emEstoque.length;
+  statCount.textContent = contagem;
   statAssigned.textContent = atribuidos.length;
   statLow.textContent = alertas.length;
 }
@@ -75,14 +153,17 @@ export function renderCategoryDashboard() {
   ).length;
 
   container.innerHTML = CATEGORIAS.map((cat) => {
-    const emEstoque = state.produtos.filter(
-      (p) => (p.categoriaBase || p.categoria) === cat && p.status === "estoque",
-    ).length;
-    let atribuidos = ["Mouse", "Teclado", "Wacom", "Webcam"].includes(cat)
+    const emEstoque = contarUnidades(
+      state.produtos.filter(
+        (p) => categoriaBaseProduto(p) === cat && p.status === "estoque",
+      ),
+    );
+    const atribuidos =
+      ["Mouse", "Teclado", "Webcam"].includes(cat)
       ? usoPc
       : state.produtos.filter(
           (p) =>
-            (p.categoriaBase || p.categoria) === cat &&
+            categoriaBaseProduto(p) === cat &&
             p.status === "atribuido",
         ).length;
 
@@ -110,7 +191,7 @@ export function renderTable() {
 
   // ALERTA AUTOMÁTICO: se uma categoria específica estiver selecionada e tiver 3 ou menos itens
   if (state.filtroCategoria !== "Todas") {
-    const qtdEstoque = produtos.length;
+    const qtdEstoque = contarUnidades(produtos);
     if (qtdEstoque <= 3) {
       if (window.Swal) {
         Swal.fire({
@@ -144,12 +225,31 @@ export function renderTable() {
         : p.categoria;
       return `
       <tr>
-        <td>${escapeHtml(p.nome)}</td>
-        <td>${escapeHtml(catExibicao)}</td>
-        <td><div class="row-actions">
-          <button class="icon-btn" data-action="assign" data-id="${p.id}">Atribuir</button>
-          <button class="icon-btn" data-action="edit" data-id="${p.id}">Editar</button>
-          <button class="icon-btn danger" data-action="delete" data-id="${p.id}">Excluir</button>
+        <td data-label="${produtoIndividual(p) ? "Nome / Modelo" : "Tipo"}">
+          ${escapeHtml(p.nome)}
+          ${
+            p.observacaoCadastro
+              ? `<details class="stock-note"><summary>Observação do item</summary>${renderObservationEditor(p)}</details>`
+              : `<details class="stock-note"><summary>Adicionar observação</summary>${renderObservationEditor(p)}</details>`
+          }
+        </td>
+        <td data-label="Categoria">${escapeHtml(catExibicao)}</td>
+        <td data-label="Quantidade">
+          ${
+            produtoIndividual(p)
+              ? "—"
+              : `<strong class="${quantidadeEmEstoque(p) < 0 ? "quantity-deficit" : ""}">${quantidadeEmEstoque(p)}</strong>
+                 ${quantidadeEmEstoque(p) < 0 ? '<span class="quantity-deficit-label">em falta</span>' : "un."}`
+          }
+        </td>
+        <td data-label="Ações"><div class="row-actions">
+          ${
+            produtoIndividual(p)
+              ? `<button class="icon-btn" data-action="assign" data-id="${escapeHtml(String(p.id))}">Atribuir</button>
+                 <button class="icon-btn" data-action="edit" data-id="${escapeHtml(String(p.id))}">Editar</button>
+                 <button class="icon-btn danger" data-action="delete" data-id="${escapeHtml(String(p.id))}">Excluir</button>`
+              : `<button class="icon-btn" data-action="adjust-quantity" data-id="${escapeHtml(String(p.id))}">Ajustar quantidade</button>`
+          }
         </div></td>
       </tr>`;
     })
@@ -162,10 +262,20 @@ export function renderAssignedTable() {
   if (!tbody || !emptyState) return;
 
   const atribuidos = itensAtribuidos();
+  const totalAtribuidos = state.produtos.filter(
+    (produto) => produto.status === "atribuido",
+  ).length;
+  const resultCount = document.getElementById("assignedResultCount");
+  if (resultCount) {
+    resultCount.textContent = `${atribuidos.length} de ${totalAtribuidos} equipamento(s)`;
+  }
 
   if (atribuidos.length === 0) {
     tbody.innerHTML = "";
     emptyState.style.display = "block";
+    emptyState.textContent = totalAtribuidos
+      ? "Nenhum equipamento corresponde aos filtros."
+      : "Nenhum equipamento atribuído no momento.";
     return;
   }
   emptyState.style.display = "none";
@@ -178,16 +288,18 @@ export function renderAssignedTable() {
         : p.categoria;
       return `
       <tr>
-        <td>${escapeHtml(p.nome)}</td>
-        <td>${escapeHtml(catExibicao)}</td>
-        <td>${escapeHtml(p.atribuidoPara || "—")}</td>
-        <td>${p.dataAtribuicao || "—"}</td>
-        <td><input type="text" class="obs-input" data-id="${p.id}" value="${escapeHtml(p.observacao)}" placeholder="Adicionar obs..." style="width: 100%; min-width: 130px; padding: 0.3rem 0.5rem; background: var(--bg-elev-2); border: 1px solid var(--line); color: var(--text); border-radius: 4px; font-size: 0.85rem;" /></td>
-        <td><label style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+        <td data-label="Item">
+          <span class="assigned-item-name">${escapeHtml(p.nome)}</span>
+        </td>
+        <td data-label="Categoria">${escapeHtml(catExibicao)}</td>
+        <td data-label="Atribuído Para">${escapeHtml(p.atribuidoPara || "—")}</td>
+        <td data-label="Data">${escapeHtml(p.dataAtribuicao || "—")}</td>
+        <td data-label="Observação do item">${renderObservationEditor(p)}</td>
+        <td data-label="Atlas"><label style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
           <input type="checkbox" class="atlas-checkbox" data-id="${p.id}" ${checked} style="cursor: pointer;" />
           <span style="font-size: 0.85rem; color: ${p.atlasOk ? "var(--mint, #3ddc97)" : "var(--text-dim)"};">${p.atlasOk ? "OK" : "Pendente"}</span>
         </label></td>
-        <td><div class="row-actions">
+        <td data-label="Ações"><div class="row-actions">
           <button class="icon-btn" data-action="return" data-id="${p.id}">Devolver ao estoque</button>
           <button class="icon-btn danger" data-action="delete" data-id="${p.id}">Excluir</button>
         </div></td>
@@ -236,9 +348,15 @@ export function renderAssignedCategoryFilters() {
 export function renderCategoryBreakdown() {
   const listEl = document.getElementById("categoryList");
   const chartEl = document.getElementById("categoryChart");
-  if (!listEl || !chartEl) return;
+  if (!listEl) return;
 
-  const contagem = contarPorCategoriaRecursivo(itensEmEstoque());
+  const estoque = itensEmEstoque();
+  const contagem = {};
+  estoque.forEach((produto) => {
+    const categoria = produto.subcategoria || categoriaBaseProduto(produto);
+    contagem[categoria] =
+      (contagem[categoria] || 0) + quantidadeEmEstoque(produto);
+  });
   const todasCategoriasPainel = CATEGORIAS.concat(CATEGORIAS_PECAS);
 
   listEl.innerHTML = todasCategoriasPainel
@@ -261,11 +379,21 @@ export function renderCategoryBreakdown() {
     })
     .join("");
 
-  if (window.Chart) {
+  if (chartEl) {
+    const chartTotal = document.getElementById("stockChartTotal");
+    const categoriasGrafico = CATEGORIAS.concat(CATEGORIAS_PECAS);
+    const contagemGrafico = categoriasGrafico.reduce((total, categoria) => {
+      return total + Math.max(contagem[categoria] || 0, 0);
+    }, 0);
+    if (chartTotal) chartTotal.textContent = String(contagemGrafico);
+  }
+
+  if (window.Chart && chartEl) {
     const ctx = chartEl.getContext("2d");
-    const labels = CATEGORIAS.filter((cat) => contagem[cat] > 0);
+    const categoriasGrafico = CATEGORIAS.concat(CATEGORIAS_PECAS);
+    const labels = categoriasGrafico.filter((cat) => contagem[cat] > 0);
     const dados = labels.map((cat) => contagem[cat]);
-    const cores = labels.map((cat) => CATEGORY_COLORS[cat]);
+    const cores = labels.map((cat) => CATEGORY_COLORS[cat] || "#8d99ae");
 
     if (chartInstance) chartInstance.destroy();
     chartInstance = new Chart(ctx, {
@@ -275,6 +403,8 @@ export function renderCategoryBreakdown() {
         datasets: [{ data: dados, backgroundColor: cores, borderWidth: 0 }],
       },
       options: {
+        responsive: true,
+        maintainAspectRatio: true,
         plugins: { legend: { display: false } },
         cutout: "68%",
       },
@@ -310,6 +440,18 @@ export function renderTarefas() {
 }
 
 export function renderAll() {
+  const activeElement = document.activeElement;
+  const activeNote =
+    activeElement instanceof HTMLTextAreaElement &&
+    activeElement.classList.contains("item-note-input")
+      ? {
+          id: activeElement.dataset.id,
+          start: activeElement.selectionStart,
+          end: activeElement.selectionEnd,
+          detailsOpen: activeElement.closest("details")?.open || false,
+        }
+      : null;
+
   renderStats();
   renderCategoryDashboard();
   renderCategoryFilters();
@@ -318,4 +460,16 @@ export function renderAll() {
   renderAssignedTable();
   renderCategoryBreakdown();
   renderTarefas();
+
+  if (activeNote?.id) {
+    const replacement = [...document.querySelectorAll(".item-note-input")].find(
+      (input) => input.dataset.id === activeNote.id,
+    );
+    if (replacement) {
+      const details = replacement.closest("details");
+      if (details && activeNote.detailsOpen) details.open = true;
+      replacement.focus();
+      replacement.setSelectionRange(activeNote.start, activeNote.end);
+    }
+  }
 }

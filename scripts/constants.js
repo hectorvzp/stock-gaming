@@ -27,6 +27,32 @@ export const CATEGORIAS_PECAS = [
 export const CATEGORIAS = Object.keys(CATEGORY_COLORS);
 export const CATEGORIAS_PERMITIDAS_ATRIBUICAO = ["PC", "Monitor", "Wacom"];
 export const CATEGORIAS_SEM_DUPLICADOS = ["PC", "Monitor", "Wacom"];
+export const CATEGORIAS_QUANTIDADE_POR_PC = ["Mouse", "Teclado", "Webcam"];
+
+export function categoriaBaseProduto(produto) {
+  return produto.categoriaBase || produto.categoria;
+}
+
+export function produtoIndividual(produto) {
+  return CATEGORIAS_SEM_DUPLICADOS.includes(categoriaBaseProduto(produto));
+}
+
+export function chaveEstoqueQuantidade(produto) {
+  const base = categoriaBaseProduto(produto);
+  return base === "Outro"
+    ? `${base}:${produto.subcategoria || ""}`
+    : base;
+}
+
+export function idEstoqueQuantidade(produto) {
+  return `estoque-qtd-${encodeURIComponent(chaveEstoqueQuantidade(produto)).replace(/%/g, "_")}`;
+}
+
+export function nomeEstoqueQuantidade(produto) {
+  return categoriaBaseProduto(produto) === "Outro"
+    ? `Outro (${produto.subcategoria})`
+    : categoriaBaseProduto(produto);
+}
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDNwMn8TqY-YDFcA7rF2IpeFWW_GREsp2s",
