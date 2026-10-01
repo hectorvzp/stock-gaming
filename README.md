@@ -95,3 +95,33 @@ Open the local URL provided in your terminal (e.g., http://localhost:3000).
 
 ## 📄 License
 Developed for internal hardware management and educational purposes. Open for customization and improvements.
+
+
+## 🚀 New Features: Assigned Assets Module & Cloud Database
+
+The **Assigned Assets** section (`atribuidos.html`) has been updated to deliver real-time management powered by **Cloud Firestore**, providing instant data persistence and dynamic filtering.
+
+### 📋 Key Features
+
+* **Combined Dynamic Filtering:**
+  * **Keyword Search:** Instant, case-insensitive text search by user/responsible party or item name.
+  * **Atlas Verification Status:** Toggle selector to filter items instantly by status (**OK** vs. **Pending**).
+* **Live Metric Cards:**
+  * Real-time counters at the top of the dashboard displaying **Total Assigned**, **Atlas OK**, and **Atlas Pending** counts.
+* **Real-Time Cloud Database Integration (Firestore):**
+  * Live snapshot listeners (`onSnapshot`) integrated within `storage.js` to propagate real-time database updates to all connected clients without page reloads.
+* **Local Caching & Performance Optimization:**
+  * Decoupled UI rendering logic in `ui.js` utilizing `DocumentFragment` updates to minimize direct DOM manipulations and eliminate redundant database queries.
+
+---
+
+## 🛠️ Modular JS Architecture
+
+```text
+├── atribuidos.html    # Section layout containing metrics cards, search bar, and table
+└── js/
+    ├── app.js         # Main application lifecycle orchestrator
+    ├── storage.js     # Real-time Cloud Firestore listeners and data queries
+    ├── ui.js          # Rendering pipelines, event listeners, and filtering logic
+    ├── state.js       # Application state and local caching layer
+    └── constants.js   # Project-wide collection keys and constants
